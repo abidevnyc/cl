@@ -13,7 +13,7 @@ jobs:
       - name: Set up FreeBSD VM
         uses: vmactions/freebsd-vm@v0.3.1
         with:
-          freebsd-version: '14'
+          freebsd-version: '13.2'
           vm-arch: 'amd64'
 
       # Step 2: Install build dependencies on FreeBSD
