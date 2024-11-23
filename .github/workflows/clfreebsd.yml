@@ -1,58 +1,46 @@
-name: Build and Package Cloudflared on FreeBSD
+name: Build cloudflared on FreeBSD
 
 on:
   push:
-    branches:
-      - main
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
 
 jobs:
-  freebsd-build:
+  build:
     runs-on: ubuntu-latest
+    name: Build on FreeBSD
     steps:
-      # Step 1: Set up FreeBSD VM
-      - name: Set up FreeBSD VM
-        uses: vmactions/freebsd-vm@v0.3.1
-        with:
-          freebsd-version: '13.2'
-          vm-arch: 'amd64'
-
-      # Step 2: Install build dependencies on FreeBSD
-      - name: Install build dependencies
+    - uses: actions/checkout@v4
+    
+    - name: Test in FreeBSD
+      uses: vmactions/freebsd-vm@v1
+      with:
+        usesh: true
+        prepare: |
+          pkg install -y git go gmake
+          
+    - name: Build cloudflared
+      uses: vmactions/freebsd-vm@v1
+      with:
+        usesh: true
         run: |
-          ssh freebsd@127.0.0.1 -p 22 -o StrictHostKeyChecking=no -i $HOME/.ssh/id_rsa << 'EOF'
-          sudo pkg update
-          sudo pkg install -y git go gmake gcc
-          EOF
-
-      # Step 3: Clone the cloudflared repository
-      - name: Clone cloudflared repository
-        run: |
-          ssh freebsd@127.0.0.1 -p 22 -o StrictHostKeyChecking=no -i $HOME/.ssh/id_rsa << 'EOF'
           git clone https://github.com/cloudflare/cloudflared.git
           cd cloudflared
-          EOF
-
-      # Step 4: Build the cloudflared binary
-      - name: Build cloudflared
-        run: |
-          ssh freebsd@127.0.0.1 -p 22 -o StrictHostKeyChecking=no -i $HOME/.ssh/id_rsa << 'EOF'
-          cd cloudflared
-          go build -o cloudflared
-          EOF
-
-      # Step 5: Retrieve the binary
-      - name: Retrieve the binary
-        run: |
-          scp -P 22 -o StrictHostKeyChecking=no -i $HOME/.ssh/id_rsa freebsd@127.0.0.1:/home/freebsd/cloudflared/cloudflared ./cloudflared
-
-      # Step 6: Package the binary
-      - name: Package the binary
-        run: |
-          tar -czvf cloudflared-freebsd.tar.gz cloudflared
-
-      # Step 7: Upload the artifact
-      - name: Upload artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: cloudflared-freebsd
-          path: cloudflared-freebsd.tar.gz
+          make cloudflared
+          cat /etc/os-release
+          
+          # Verify the binary was built
+          file cloudflared
+          ./cloudflared --version
+          
+          # Optional: Create artifacts
+          mkdir -p artifacts
+          cp cloudflared artifacts/
+          
+    - name: Upload artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: cloudflared-freebsd
+        path: cloudflared/artifacts/
